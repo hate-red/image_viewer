@@ -45,25 +45,50 @@ def main(page: ft.Page) -> None:
         Used in file pickers event handlers. 
         Make new elements visible when image/images are selected 
         """
+        swipe_left_btn.visible = True if len(selected_images_paths) > 1 else False
+        swipe_right_btn.visible = True if len(selected_images_paths) > 1 else False
+
         image_container.visible = True
         image_block.visible = True
         tools_row.visible = True
-        selected_images_text.visible = False
+        selected_images_paths_text.visible = False
+
         save_file_btn.disabled = False
 
 
-    def process_images_paths(images_paths: list) -> None:
+    def convert_to_b64(image: Image.Image):
         """
-        Receives list of images paths and opens then as pillow `Image` objects 
+        Takes `pillow` Image object, saves it to RAM buffer,
+        encodes is to `base64` string and decodes it into utf-8 string.
+        This is highlt inefficient and is to be reworked in future
         """
-        if len(images_paths) > 1:
-            swipe_left_btn.visible = True
-            swipe_right_btn.visible = True
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG")
+        
+        base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return base64_str
 
-        nonlocal selected_images, current_image
-        selected_images = [Image.open(path) for path in images_paths] # type: ignore
-        current_image = selected_images[0]
-        image_container.src = convert_to_b64(current_image)
+
+    def set_image_to_container(image: Image.Image) -> None:
+        """
+        Takes `pillow` Image, converts it to base64 string.
+        That string to then put to `image_container` and displayed
+        """
+        base64_img = convert_to_b64(image)        
+        
+        image_container.src = base64_img
+        page.update()
+
+
+    def update_current_image() -> None:
+        """
+        Sets `current_image` and its index in `selected_images_paths`
+        """
+        nonlocal current_image, current_image_ind
+        current_image = Image.open(selected_images_paths[0]) # type: ignore
+        current_image_ind = 0
+
+        set_image_to_container(current_image)
 
 
     async def handle_pick_dir(e: ft.Event[ft.Button]) -> None:
@@ -72,7 +97,6 @@ def main(page: ft.Page) -> None:
         Updates current image and displays new elements on the page 
         (image block itself, tools, swipe buttons)
         """
-        
         path_or_none = getenv('INITIAL_DIR')
         initial_dir = Path(path_or_none) if path_or_none is not None else None 
 
@@ -84,19 +108,19 @@ def main(page: ft.Page) -> None:
         if not selected_dir:
             return 
 
-        dir = Path(selected_dir)
-        images_paths = [
-            path for path in dir.iterdir()
+        nonlocal selected_images_paths
+        selected_images_paths = [
+            path for path in Path(selected_dir).iterdir()
             if path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.webp'] 
         ]
 
-        process_images_paths(images_paths)
+        update_current_image()
         toggle_visibility()
 
         page.update()
 
 
-    async def handle_pick_file(e: ft.Event[ft.Button]) -> None:
+    async def handle_pick_images(e: ft.Event[ft.Button]) -> None:
         """
         Event handler for selecting image file. 
         Updates current image and displays new elements on the page 
@@ -110,35 +134,15 @@ def main(page: ft.Page) -> None:
         if not images:
             return
         
-        images_paths = [image.path for image in images]
+        nonlocal selected_images_paths
+        selected_images_paths = [image.path for image in images]
 
-        process_images_paths(images_paths)
+        update_current_image()
+
+        show_swipe_btns = bool(len(selected_images_paths) - 1)
+        print(show_swipe_btns)
         toggle_visibility()
 
-        page.update()
-
-
-    def convert_to_b64(image: Image.Image):
-        """
-        Takes `pillow` Image object, saves it to RAM buffer,
-        encodes is to `base64` string and decodes it into utf-8 string.
-        This is highlt inefficient and is to be reworked in future
-        """
-        buffer = io.BytesIO()
-        image.save(buffer, format="PNG")
-        
-        base64_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
-        return base64_img
-
-
-    def update_image(image: Image.Image) -> None:
-        """
-        Takes `pillow` Image, converts it to base64 string.
-        That string to then put to `image_container`
-        """
-        base64_img = convert_to_b64(image)        
-        
-        image_container.src = base64_img
         page.update()
 
 
@@ -152,7 +156,7 @@ def main(page: ft.Page) -> None:
             return 
         
         current_image = current_image.rotate(90, expand=True)
-        update_image(current_image)
+        set_image_to_container(current_image)
 
 
     def apply_right_rotation(e) -> None:
@@ -165,35 +169,35 @@ def main(page: ft.Page) -> None:
             return 
         
         current_image = current_image.rotate(-90, expand=True)
-        update_image(current_image)
+        set_image_to_container(current_image)
 
 
     def swipe_left(e):
         """
-        Event handler for switching to the previous image in the `selected_images` list
+        Event handler for switching to the previous image in the `selected_images_paths` list
         """
         nonlocal current_image, current_image_ind
 
         if current_image_ind <= 0:
             return
 
-        current_image = selected_images[current_image_ind - 1]
+        current_image = Image.open(selected_images_paths[current_image_ind - 1]) # type: ignore
         current_image_ind -= 1
-        update_image(current_image)
+        set_image_to_container(current_image)
 
 
     def swipe_right(e):
         """
-        Event handler for switching to the next image in the `selected_images` list
+        Event handler for switching to the next image in the `selected_images_paths` list
         """
         nonlocal current_image, current_image_ind
 
-        if current_image_ind >= len(selected_images) - 1:
+        if current_image_ind >= len(selected_images_paths) - 1:
             return
 
-        current_image = selected_images[current_image_ind + 1]
+        current_image = Image.open(selected_images_paths[current_image_ind + 1]) # type: ignore
         current_image_ind += 1
-        update_image(current_image)
+        set_image_to_container(current_image)
 
 
     def resize_crop_area(e: ft.DragUpdateEvent):
@@ -241,7 +245,7 @@ def main(page: ft.Page) -> None:
     # all the buttons for menu
     open_file_btn = ft.Button(
         content=ft.Text('Open Image', size=18), 
-        on_click=handle_pick_file,
+        on_click=handle_pick_images,
         height=40,
         autofocus=True,
     )
@@ -257,7 +261,7 @@ def main(page: ft.Page) -> None:
     )
 
     # displays on startup when no images are selected
-    selected_images_text = ft.Text(
+    selected_images_paths_text = ft.Text(
         value='No files selected', 
         size=24, 
         opacity=0.5
@@ -271,9 +275,7 @@ def main(page: ft.Page) -> None:
         height=300,
         expand=True,
     )
-
     resize_handle_size = 20
-
     # small handle in the bottom right corner 
     # of the crop_area to resize it
     resize_handle = ft.GestureDetector(
@@ -289,8 +291,8 @@ def main(page: ft.Page) -> None:
         bottom=0,
         right=0,
     )
+    # area to be cropped with control stacked on it
     cropper = ft.Stack([crop_area, resize_handle], visible=False)
-
     # realises crop tool functionality 
     crop_gesture_decector = ft.GestureDetector(
         drag_interval=10,
@@ -299,6 +301,7 @@ def main(page: ft.Page) -> None:
         visible=False,
         content=cropper,
     )
+    
     image_container = ft.Image(
         src='',
         visible=False,
@@ -309,13 +312,11 @@ def main(page: ft.Page) -> None:
         visible=False,
     )
     
-    # storing image that is displayed right now
-    current_image = None
-    
     # list of all images in a given directory
-    selected_images = []
-
-    # index of current image in selected_images
+    selected_images_paths = []
+    # storing image that is displayed right now
+    current_image: Image.Image | None = None
+    # index of current image in selected_images_paths
     current_image_ind = 0
 
     # buttons to switch between images
@@ -341,18 +342,19 @@ def main(page: ft.Page) -> None:
     # button resbonsible for creating crop_area over current_image
     crop_btn = ft.IconButton(ft.Icons.CROP, on_click=toggle_crop_area_visibility)
 
-    # Collecting all elements into rows
+    # collecting all elements into rows
     menu_row = ft.Row(
         controls=[open_file_btn, open_dir_btn, save_file_btn], 
         alignment=ft.MainAxisAlignment.CENTER,
     )
 
+    # row where images are displayed
     main_row = ft.Row(
         controls=[
             ft.Column(
                 controls=[swipe_left_btn], 
             ),
-            selected_images_text, 
+            selected_images_paths_text, 
             image_block,
             ft.Column(
                 controls=[swipe_right_btn], 
@@ -371,7 +373,7 @@ def main(page: ft.Page) -> None:
         visible=False,
     )
 
-    # Designing page structure
+    # designing page structure
     page.add(
         ft.Container(
             content=menu_row,
