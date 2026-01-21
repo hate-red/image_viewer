@@ -138,9 +138,6 @@ def main(page: ft.Page) -> None:
         selected_images_paths = [image.path for image in images]
 
         update_current_image()
-
-        show_swipe_btns = bool(len(selected_images_paths) - 1)
-        print(show_swipe_btns)
         toggle_visibility()
 
         page.update()
@@ -179,10 +176,11 @@ def main(page: ft.Page) -> None:
         nonlocal current_image, current_image_ind
 
         if current_image_ind <= 0:
-            return
+            current_image_ind = len(selected_images_paths) - 1
+        else:
+            current_image_ind -= 1
 
-        current_image = Image.open(selected_images_paths[current_image_ind - 1]) # type: ignore
-        current_image_ind -= 1
+        current_image = Image.open(selected_images_paths[current_image_ind]) # type: ignore
         set_image_to_container(current_image)
 
 
@@ -193,10 +191,11 @@ def main(page: ft.Page) -> None:
         nonlocal current_image, current_image_ind
 
         if current_image_ind >= len(selected_images_paths) - 1:
-            return
+            current_image_ind = 0
+        else:
+            current_image_ind += 1
 
-        current_image = Image.open(selected_images_paths[current_image_ind + 1]) # type: ignore
-        current_image_ind += 1
+        current_image = Image.open(selected_images_paths[current_image_ind]) # type: ignore
         set_image_to_container(current_image)
 
 
