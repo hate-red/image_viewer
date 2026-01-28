@@ -199,7 +199,7 @@ def main(page: ft.Page) -> None:
         set_image_to_container(current_image)
 
 
-    def resize_crop_area(e: ft.DragUpdateEvent):
+    async def resize_crop_area(e: ft.DragUpdateEvent):
         """
         Event handler for resizing `crop_area` with mouse
         """
@@ -212,10 +212,10 @@ def main(page: ft.Page) -> None:
         crop_area.width = crop_area.width + e.local_delta.x # type: ignore
         crop_area.height = crop_area.height + e.local_delta.y # type: ignore
 
-        page.update()
+        e.control.update()
 
 
-    def change_crop_area_position(e: ft.DragUpdateEvent):
+    async def change_crop_area_position(e: ft.DragUpdateEvent):
         """
         Event handler for moving `crop_area` with mouse
         """
@@ -228,17 +228,18 @@ def main(page: ft.Page) -> None:
         e.control.left = e.control.left + e.local_delta.x # type: ignore
         e.control.top = e.control.top + e.local_delta.y # type: ignore
 
-        page.update()
+        cropper.update()
 
 
     def toggle_crop_area_visibility(e):
         """
-        Toggles visibility of `crop_area` when `crop_btn` is pressed
+        Toggles visibility of `crop_gesture_decector` and 
+        its components when `crop_btn` is pressed
         """
         cropper.visible = not cropper.visible
         crop_gesture_decector.visible = not crop_gesture_decector.visible
 
-        page.update()
+        crop_gesture_decector.update()
 
 
     # all the buttons for menu
@@ -269,7 +270,9 @@ def main(page: ft.Page) -> None:
     # a sort of overlay on current image
     # displaying area that would be cropped 
     crop_area = ft.Container(
-        border=ft.Border.all(1, color=ft.Colors.WHITE),
+        border=ft.Border.all(1, color=ft.Colors.BLUE_GREY_700),
+        bgcolor=ft.Colors.BLUE_GREY_700,
+        opacity=0.3,
         width=300,
         height=300,
         expand=True,
@@ -283,8 +286,8 @@ def main(page: ft.Page) -> None:
             width=resize_handle_size,
             height=resize_handle_size,
             border=ft.Border(
-                right=ft.BorderSide(4, ft.Colors.WHITE), 
-                bottom=ft.BorderSide(4, ft.Colors.WHITE)
+                right=ft.BorderSide(4, ft.Colors.BLUE_GREY_700), 
+                bottom=ft.BorderSide(4, ft.Colors.BLUE_GREY_700)
             )
         ),
         bottom=0,
