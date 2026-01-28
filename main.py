@@ -30,7 +30,7 @@ def main(page: ft.Page) -> None:
     main_row_height = page.window.height - (menu_row_height + tools_row_height) # type: ignore
 
 
-    def on_window_resize(e):
+    def on_window_resize(e) -> None:
         """
         Changes window inner elements sizes when window is resized
         """
@@ -39,6 +39,28 @@ def main(page: ft.Page) -> None:
 
         page.update()
 
+
+    async def keyboard_handler(e: ft.KeyboardEvent) -> None:
+        match (e.key):
+            case 'F':
+                _ = await handle_pick_images(e) # type: ignore
+            case 'D':
+                _ = await handle_pick_dir(e) # type: ignore
+            
+            case 'Arrow Right': 
+                swipe_right(e)
+            case 'Arrow Left': 
+                swipe_left(e)
+
+            case 'E':
+                apply_left_rotation(e)
+            case 'R': 
+                apply_right_rotation(e)
+            case 'C':
+                toggle_cropper_visibility(e)
+
+            case 'Enter': 
+                crop_image()
 
     def toggle_visibility() -> None:
         """
@@ -56,7 +78,7 @@ def main(page: ft.Page) -> None:
         save_file_btn.disabled = False
 
 
-    def convert_to_b64(image: Image.Image):
+    def convert_to_b64(image: Image.Image) -> str:
         """
         Takes `pillow` Image object, saves it to RAM buffer,
         encodes is to `base64` string and decodes it into utf-8 string.
@@ -80,18 +102,22 @@ def main(page: ft.Page) -> None:
         page.update()
 
 
-    def update_current_image() -> None:
+    def update_current_image(image: Image.Image | None = None) -> None:
         """
         Sets `current_image` and its index in `selected_images_paths`
         """
         nonlocal current_image, current_image_ind
-        current_image = Image.open(selected_images_paths[0]) # type: ignore
-        current_image_ind = 0
+        
+        if image is None:
+            current_image = Image.open(selected_images_paths[0]) # type: ignore
+            current_image_ind = 0
+        else:
+            current_image = image
 
         set_image_to_container(current_image)
 
 
-    async def handle_pick_dir(e: ft.Event[ft.Button]) -> None:
+    async def handle_pick_dir(e) -> None:
         """
         Event handler for selecting directory with images. 
         Updates current image and displays new elements on the page 
@@ -120,7 +146,7 @@ def main(page: ft.Page) -> None:
         page.update()
 
 
-    async def handle_pick_images(e: ft.Event[ft.Button]) -> None:
+    async def handle_pick_images(e) -> None:
         """
         Event handler for selecting image file. 
         Updates current image and displays new elements on the page 
@@ -169,7 +195,7 @@ def main(page: ft.Page) -> None:
         set_image_to_container(current_image)
 
 
-    def swipe_left(e):
+    def swipe_left(e) -> None:
         """
         Event handler for switching to the previous image in the `selected_images_paths` list
         """
@@ -184,7 +210,7 @@ def main(page: ft.Page) -> None:
         set_image_to_container(current_image)
 
 
-    def swipe_right(e):
+    def swipe_right(e) -> None:
         """
         Event handler for switching to the next image in the `selected_images_paths` list
         """
@@ -199,7 +225,7 @@ def main(page: ft.Page) -> None:
         set_image_to_container(current_image)
 
 
-    async def resize_crop_area(e: ft.DragUpdateEvent):
+    async def resize_crop_area(e: ft.DragUpdateEvent) -> None:
         """
         Event handler for resizing `crop_area` with mouse
         """
@@ -215,9 +241,9 @@ def main(page: ft.Page) -> None:
         e.control.update()
 
 
-    async def change_crop_area_position(e: ft.DragUpdateEvent):
+    async def change_cropper_position(e: ft.DragUpdateEvent) -> None:
         """
-        Event handler for moving `crop_area` with mouse
+        Event handler for moving `cropper` with mouse
         """
         if e.local_delta.x is None or e.control.top is None: # type: ignore
             e.local_delta.x = 0 # type: ignore
@@ -231,15 +257,26 @@ def main(page: ft.Page) -> None:
         cropper.update()
 
 
-    def toggle_crop_area_visibility(e):
+    def toggle_cropper_visibility(e) -> None:
         """
         Toggles visibility of `crop_gesture_decector` and 
-        its components when `crop_btn` is pressed
+        its component `cropper` when `crop_btn` is pressed
         """
         cropper.visible = not cropper.visible
         crop_gesture_decector.visible = not crop_gesture_decector.visible
 
-        crop_gesture_decector.update()
+        cropper.update()
+
+
+    def crop_image() -> None:
+        top, left = cropper.top, cropper.left
+        right, bottom = left + crop_area.width, top + crop_area.height # type: ignore
+
+        cropped_image = current_image.crop((left, top, right, bottom)) #type: ignore
+        set_image_to_container(cropped_image)
+        crop_gesture_decector.visible = not crop_gesture_decector.visible
+
+        page.update()
 
 
     # all the buttons for menu
@@ -247,7 +284,6 @@ def main(page: ft.Page) -> None:
         content=ft.Text('Open Image', size=18), 
         on_click=handle_pick_images,
         height=40,
-        autofocus=True,
     )
     open_dir_btn = ft.Button(
         content=ft.Text('Open Dir', size=18),
@@ -277,6 +313,7 @@ def main(page: ft.Page) -> None:
         height=300,
         expand=True,
     )
+    
     resize_handle_size = 20
     # small handle in the bottom right corner 
     # of the crop_area to resize it
@@ -299,7 +336,7 @@ def main(page: ft.Page) -> None:
     crop_gesture_decector = ft.GestureDetector(
         drag_interval=10,
         mouse_cursor=ft.MouseCursor.MOVE,
-        on_pan_update=change_crop_area_position,
+        on_pan_update=change_cropper_position,
         visible=False,
         content=cropper,
     )
@@ -342,7 +379,7 @@ def main(page: ft.Page) -> None:
     )
 
     # button resbonsible for creating crop_area over current_image
-    crop_btn = ft.IconButton(ft.Icons.CROP, on_click=toggle_crop_area_visibility)
+    crop_btn = ft.IconButton(ft.Icons.CROP, on_click=toggle_cropper_visibility)
 
     # collecting all elements into rows
     menu_row = ft.Row(
@@ -397,7 +434,7 @@ def main(page: ft.Page) -> None:
 
     # setting event handler for window resize
     page.on_resize = on_window_resize
-
+    page.on_keyboard_event = keyboard_handler
     page.update()
 
 
